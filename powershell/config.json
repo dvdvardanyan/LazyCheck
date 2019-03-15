@@ -1,0 +1,50 @@
+[
+    {
+        "description": "Infrastructure Check",
+        "active": true,
+        "connectionChecks": [
+            {
+                "active": true,
+                "host": "localhost",
+                "count": 4
+            }
+        ],
+        "serviceChecks": [
+            {
+                "active": true,
+                "host": "localhost",
+                "services": [
+                    { "name": "MyService", "expectedStatus": "Running" }
+                ]
+            }
+        ],
+        "sqlChecks": [
+            {
+                "active": true,
+                "host": "localhost",
+                "instances": [
+                    { "name": "\\SQL2012", "trustedConnection": false, "user": "MyUser", "password": "MyPassword" },
+                    { "name": "\\SQL2016", "trustedConnection": true }
+                ]
+            }
+        ],
+        "portChecks": [
+            {
+                "active": true,
+                "host": "localhost",
+                "ports": [
+                    { "port": 1433, "expectedStatus": "Open" }
+                ]
+            }
+        ],
+        "sharedObjectChecks": [
+            {
+                "active": false,
+                "host": "localhost",
+                "objects": [
+                    { "path": "\\\\SomeServer\\D$\\MyFolder", "expected": true }
+                ]
+            }
+        ]
+    }
+]
