@@ -18,7 +18,7 @@
                 ]
             }
         ],
-        "sqlChecks": [
+        "sqlConnectionChecks": [
             {
                 "active": true,
                 "host": "localhost",
@@ -26,6 +26,21 @@
                     { "name": "\\SQL2012", "trustedConnection": false, "user": "MyUser", "password": "MyPassword" },
                     { "name": "\\SQL2016", "trustedConnection": true }
                 ]
+            }
+        ],
+		"sqlCommandChecks": [
+            {
+                "active": true,
+                "host": "localhost",
+                "instance": { "name": "\\SQL2012", "trustedConnection": true },
+                "command": "select AGS.primary_replica as [Primary Replica], AGS.primary_recovery_health_desc as [Recovery Health], AGS.synchronization_health_desc as [Synchronization Health] from sys.availability_groups as AG inner join sys.dm_hadr_availability_group_states as AGS on AG.group_id = AGS.group_id where AG.name = 'AG_Name'",
+                "checks": [
+                    { "expected_row_num": 1 },
+                    { "row_num": 1, "column": "Primary Replica", "expectedValue": "PRIMARY_SERVER_NAME" },
+                    { "row_num": 1, "column": "Recovery Health", "expectedValue": "ONLINE" },
+                    { "row_num": 1, "column": "Synchronization Health", "expectedValue": "HEALTHY" }
+                ],
+                "description": "Availability group check"
             }
         ],
         "portChecks": [
