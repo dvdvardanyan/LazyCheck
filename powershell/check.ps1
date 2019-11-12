@@ -116,10 +116,14 @@ function Check-SqlCommand {
         [Parameter(Mandatory=$true, Position=0)][string]$computerName,
         [Parameter(Mandatory=$true, Position=1)][PSCustomObject]$instance,
         [Parameter(Mandatory=$true, Position=2)][string]$command,
-        [Parameter(Mandatory=$true, Position=3)][PSCustomObject]$checks
+        [Parameter(Mandatory=$true, Position=3)][PSCustomObject]$checks,
+		[Parameter(Mandatory=$true, Position=4)][string]$description
     )
 
     $sqlInstance = [string]::Format("{0}{1}", $computerName, $instance.name);
+	
+	Write-Host "[ INFO ] - $($description) on $($sqlInstance)" -ForeGroundColor White;
+    Write-Host "";
 
     if($instance.port -ne $null -and $instance.port -ne 0) {
         $sqlInstance = $sqlInstance + [string]::Format(",{0}", $instance.port);
@@ -352,11 +356,7 @@ foreach($command in $commands) {
         if($command.sqlCommandChecks -ne $null -and $command.sqlCommandChecks.length -gt 0) {
 			foreach($check in $command.sqlCommandChecks) {
 				if($check.active) {
-
-                    Write-Host "[ INFO ] - $($check.description)" -ForeGroundColor White;
-                    Write-Host "";
-
-					Check-SqlCommand $check.host $check.instance $check.command $check.checks;
+					Check-SqlCommand $check.host $check.instance $check.command $check.checks $check.description;
 					Write-Host "";
 				}
 			}
