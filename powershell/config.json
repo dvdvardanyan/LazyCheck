@@ -1,64 +1,118 @@
 [
     {
-        "description": "Infrastructure Check",
+        "description": "Environment 1 Check",
         "active": true,
-        "connectionChecks": [
+        "checks": [
             {
+                "type": "ping",
+                "active": false,
+                "hosts": [
+                    { "name": "SVR01PROD", "active": true },
+                    { "name": "SVR02PROD", "active": false },
+                    { "name": "SVR03PROD", "active": true }
+                ],
+                "count": 1
+            }, {
+                "type": "winservice",
                 "active": true,
-                "host": "localhost",
-                "count": 4
-            }
-        ],
-        "serviceChecks": [
-            {
-                "active": true,
-                "host": "localhost",
+                "hosts": [
+                    { "name": "SVR01PROD", "active": true },
+                    { "name": "SVR02PROD", "active": true },
+                    { "name": "SVR03PROD", "active": true }
+                ],
                 "services": [
-                    { "name": "MyService", "expectedStatus": "Running" }
+                    { "name": "MyService1", "expectedStatus": "Running" },
+                    { "name": "MyService2", "expectedStatus": "Stopped" }
                 ]
-            }
-        ],
-        "sqlConnectionChecks": [
-            {
+            }, {
+                "type": "port",
                 "active": true,
-                "host": "localhost",
-                "instances": [
-                    { "name": "\\SQL2012", "trustedConnection": false, "user": "MyUser", "password": "MyPassword" },
-                    { "name": "\\SQL2016", "trustedConnection": true }
+                "hosts": [
+                    { "name": "SVR01PROD", "active": true }
+                ],
+                "ports": [
+                    { "port": 5378, "expectedStatus": "Open" }
                 ]
-            }
-        ],
-		"sqlCommandChecks": [
-            {
+            }, {
+                "type": "drivespace",
                 "active": true,
-                "host": "localhost",
-                "instance": { "name": "\\SQL2012", "trustedConnection": true },
-                "command": "select AGS.primary_replica as [Primary Replica], AGS.primary_recovery_health_desc as [Recovery Health], AGS.synchronization_health_desc as [Synchronization Health] from sys.availability_groups as AG inner join sys.dm_hadr_availability_group_states as AGS on AG.group_id = AGS.group_id where AG.name = 'AG_Name'",
-                "checks": [
-                    { "expected_row_num": 1 },
-                    { "row_num": 1, "column": "Primary Replica", "expectedValue": "PRIMARY_SERVER_NAME" },
-                    { "row_num": 1, "column": "Recovery Health", "expectedValue": "ONLINE" },
-                    { "row_num": 1, "column": "Synchronization Health", "expectedValue": "HEALTHY" }
+                "hosts": [
+                    { "name": "SVR01PROD", "active": true },
+                    { "name": "SVR02PROD", "active": true },
+                    { "name": "SVR03PROD", "active": true }
+                ]
+            }, {
+                "type": "mssqlconnection",
+                "active": true,
+                "hosts": [
+                    {
+                        "name": "SVR01PROD",
+                        "instances": [{ "name": "", "trustedConnection": true }],
+                        "active": true
+                    }, {
+                        "name": "SVR02PROD",
+                        "instances": [{ "name": "", "trustedConnection": true }],
+                        "active": true
+                    }, {
+                        "name": "SVR03PROD",
+                        "instances": [{ "name": "", "trustedConnection": true }],
+                        "active": true
+                    }
+                ]
+            }, {
+                "type": "mssqlcommand",
+                "active": true,
+                "hosts": [
+                    {
+                        "name": "SVR01PROD",
+                        "instances": [{ "name": "", "trustedConnection": true }],
+                        "active": true
+                    }, {
+                        "name": "SVR02PROD",
+                        "instances": [{ "name": "", "trustedConnection": true }],
+                        "active": true
+                    }, {
+                        "name": "SVR03PROD",
+                        "instances": [{ "name": "", "trustedConnection": true }],
+                        "active": true
+                    }
+                ],
+                "commands": [
+                    {
+                        "type": "scalar",
+                        "active": true,
+                        "description": "Suspect pages check",
+                        "command": "select count(*) as [Suspect Pages Count] from msdb.dbo.suspect_pages",
+                        "checks": [
+                            { "description": "Number of suspect pages", "comparison": "eq", "value": "0" }
+                        ]
+                    }
+                ],
+                "description": "SQL health checks"
+            }, {
+                "type": "mssqlcommand",
+                "active": true,
+                "hosts": [
+                    {
+                        "name": "SVR01PROD",
+                        "instances": [{ "name": "", "trustedConnection": true }],
+                        "active": true
+                    }
+                ],
+                "commands": [
+                    {
+                        "type": "table",
+                        "active": true,
+                        "description": "Availability group check",
+                        "command": "select AGS.primary_replica as [Primary Replica], AGS.primary_recovery_health_desc as [Recovery Health], AGS.synchronization_health_desc as [Synchronization Health] from sys.availability_groups as AG inner join sys.dm_hadr_availability_group_states as AGS on AG.group_id = AGS.group_id where AG.name = 'MyAgName'",
+                        "checks": [
+                            { "column": "Primary Replica", "comparison": "eq", "value": "SVR01PROD" },
+                            { "column": "Recovery Health", "comparison": "eq", "value": "ONLINE" },
+                            { "column": "Synchronization Health", "comparison": "eq", "value": "HEALTHY" }
+                        ]
+                    }
                 ],
                 "description": "Availability group check"
-            }
-        ],
-        "portChecks": [
-            {
-                "active": true,
-                "host": "localhost",
-                "ports": [
-                    { "port": 1433, "expectedStatus": "Open" }
-                ]
-            }
-        ],
-        "sharedObjectChecks": [
-            {
-                "active": false,
-                "host": "localhost",
-                "objects": [
-                    { "path": "\\\\SomeServer\\D$\\MyFolder", "expected": true }
-                ]
             }
         ]
     }
