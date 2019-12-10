@@ -116,7 +116,7 @@ function Check-Services {
                     if($svc.Status -eq $null) {
                         Write-Host "    [ FAIL ] - $($service.name) (Not Found)" -ForeGroundColor Red;
                     } else {
-                        Write-Host ([string]::Format("[ FAIL ] - {0} ({1}) - Expected to be ({2})", $service.name, $svc.Status, $service.expectedStatus)) -ForeGroundColor Red;
+                        Write-Host ([string]::Format("    [ FAIL ] - {0} ({1}) - Expected to be ({2})", $service.name, $svc.Status, $service.expectedStatus)) -ForeGroundColor Red;
                     }
                 }
             }
@@ -311,7 +311,7 @@ function Check-SqlCommand {
                                                             switch($check.comparison) {
                                                                 # No comparison. Display only
                                                                 "none" {
-                                                                    Write-Host ([string]::Format("        [ PASS ] - {0}: {1}", $check.column, $value))  -ForeGroundColor Green;
+                                                                    Write-Host ([string]::Format("        [ PASS ] - {0}: {1}", $check.column, $value))  -ForeGroundColor Cyan;
                                                                 }
                                                                 # Greater than
                                                                 "gt" {
@@ -449,30 +449,175 @@ function Check-Ports {
     }
 }
 
-function Check-SharedObject {
+function Replace-Tokens {
+
+    [OutputType([string])]
 
     Param
     (
-        [Parameter(Mandatory=$true, Position=0)][string]$computerName,
-        [Parameter(Mandatory=$true, Position=1)][PSCustomObject]$objects
+        [Parameter(Mandatory=$true, Position=0)][string]$value,
+        [Parameter(Mandatory=$false, Position=1)][PSCustomObject[]]$tokens
     )
 
-    Write-Host " Shared Object Check: $($computerName)" -ForeGroundColor White;
+    foreach($token in $tokens) {
+        
+        switch($token.type) {
+            
+            "text" {
+
+                if([string]::IsNullOrWhiteSpace($token.token) -or [string]::IsNullOrWhiteSpace($token.value)) {
+                    Write-Host "    [ FAIL ] - Neither token nor value can be null" -ForeGroundColor Red;
+                } else {
+                    $value = $value.Replace($token.token, $token.value);
+                }
+            }
+
+            "date" {
+
+                if([string]::IsNullOrWhiteSpace($token.token) -or [string]::IsNullOrWhiteSpace($token.format)) {
+                    Write-Host "    [ FAIL ] - Neither token nor format can be null" -ForeGroundColor Red;
+                } else {
+
+                    [DateTime]$date = Get-Date;
+
+                    if($token.offset -ne $null) {
+                        if(-not [string]::IsNullOrWhiteSpace($token.offset.type) -and $token.offset.value -ne $null) {
+                            switch($token.offset.type) {
+                                "dd" {
+                                    $date = $date.AddDays($token.offset.value);
+                                }
+                            }
+                        }
+                    }
+
+                    $value = $value.Replace($token.token, $date.ToString($token.format));
+                }
+            }
+
+            default {
+                Write-Host "    [ FAIL ] - Unknown token type '$($token.type)'" -ForeGroundColor Red;
+            }
+        }
+
+    }
+
+    return $value;
+}
+
+function Check-Items {
+
+    Param
+    (
+        [Parameter(Mandatory=$true, Position=0)][PSCustomObject[]]$items
+    )
+
+    Write-Host " Item Check" -ForeGroundColor White;
     Write-Host "";
 
-    foreach($object in $objects) {
+    foreach($item in $items) {
 
-        $path = [string]::Format("\\{0}{1}", $computerName, $object.path);
+        switch($item.type) {
 
-        [bool]$objectExists = [System.IO.File]::Exists($path) -or [System.IO.Directory]::Exists($path);
+            "file" {
 
-        if($objectExists -eq $object.expected) {
-            Write-Host ([string]::Format("    [ PASS ] - Check object: {0}", $path)) -ForeGroundColor Green;
-        } else {
-            if($object.expected) {
-                Write-Host ([string]::Format("    [ FAIL ] - Object not found: {0}", $path)) -ForeGroundColor Red;
-            } else {
-                Write-Host ([string]::Format("    [ FAIL ] - Invalid object found: {0}", $path)) -ForeGroundColor Red;
+                if($item.tokens -ne $null -and $item.tokens.length -gt 0) {
+                    $item.path = Replace-Tokens $item.path $item.tokens;
+                }
+
+                [bool]$item_exists = [System.IO.File]::Exists($item.path);
+
+                if($item_exists -eq $item.expected) {
+                    Write-Host ([string]::Format("    [ PASS ] - Item check: {0}", $item.path)) -ForeGroundColor Green;
+                } else {
+                    Write-Host ([string]::Format("    [ FAIL ] - Item check: {0}. Exists: {1}. Expected: {2}", $item.path, $item_exists.ToString(), $item.expected)) -ForeGroundColor Red;
+                }
+            }
+            
+            "folder" {
+
+                if($item.tokens -ne $null -and $item.tokens.length -gt 0) {
+                    $item.path = Replace-Tokens $item.path $item.tokens;
+                }
+
+                [bool]$item_exists = [System.IO.Directory]::Exists($item.path);
+
+                if($item_exists -eq $item.expected) {
+                    Write-Host ([string]::Format("    [ PASS ] - Item check: {0}", $item.path)) -ForeGroundColor Green;
+                } else {
+                    Write-Host ([string]::Format("    [ FAIL ] - Item check: {0}. Exists: {1}. Expected: {2}", $item.path, $item_exists.ToString(), $item.expected)) -ForeGroundColor Red;
+                }
+            }
+
+            "registry" {
+
+                foreach($reg in $item.items) {
+
+                    $key = $reg.name;
+                    $key_object = Get-ItemProperty -Path $item.path -Name $key;
+                    $value = $key_object.$key;
+
+                    if($reg.comparison -eq $null -or $reg.comparison -eq "" -or $reg.comparison -eq "eq") {
+                        if($value -eq $reg.value) {
+                            Write-Host ([string]::Format("        [ PASS ] - {0}\{1}: {2}", $item.path, $key, $value))  -ForeGroundColor Green;
+                        } else {
+                            Write-Host ([string]::Format("        [ FAIL ] - {0}\{1}: {2}. Expected value: {3}", $item.path, $key, $value, $reg.value))  -ForeGroundColor Red;
+                        }
+                    } else {
+
+                        switch($reg.comparison) {
+                            # No comparison. Display only
+                            "none" {
+                                Write-Host ([string]::Format("        [ PASS ] - {0}\{1}: {2}", $item.path, $key, $value))  -ForeGroundColor Cyan;
+                            }
+                            # Greater than
+                            "gt" {
+                                if($value -gt $reg.value) {
+                                    Write-Host ([string]::Format("        [ PASS ] - {0}\{1}: {2}", $item.path, $key, $value))  -ForeGroundColor Green;
+                                } else {
+                                    Write-Host ([string]::Format("        [ FAIL ] - {0}\{1}: {2}. Expected value greater than: {3}", $item.path, $key, $value, $reg.value))  -ForeGroundColor Red;
+                                }
+                            }
+                            # Less than
+                            "lt" {
+                                if($value -gt $reg.value) {
+                                    Write-Host ([string]::Format("        [ PASS ] - {0}\{1}: {2}", $item.path, $key, $value))  -ForeGroundColor Green;
+                                } else {
+                                    Write-Host ([string]::Format("        [ FAIL ] - {0}\{1}: {2}. Expected value less than: {3}", $item.path, $key, $value, $reg.value))  -ForeGroundColor Red;
+                                }
+                            }
+                            # Not equals
+                            "ne" {
+                                if($value -gt $reg.value) {
+                                    Write-Host ([string]::Format("        [ PASS ] - {0}\{1}: {2}", $item.path, $key, $value))  -ForeGroundColor Green;
+                                } else {
+                                    Write-Host ([string]::Format("        [ FAIL ] - {0}\{1}: {2}. Expected value not equal to: {3}", $item.path, $key, $value, $reg.value))  -ForeGroundColor Red;
+                                }
+                            }
+                            # Less or equal
+                            "le" {
+                                if($value -gt $reg.value) {
+                                    Write-Host ([string]::Format("        [ PASS ] - {0}\{1}: {2}", $item.path, $key, $value))  -ForeGroundColor Green;
+                                } else {
+                                    Write-Host ([string]::Format("        [ FAIL ] - {0}\{1}: {2}. Expected value less or equal to: {3}", $item.path, $key, $value, $reg.value))  -ForeGroundColor Red;
+                                }
+                            }
+                            # Greater or equal
+                            "ge" {
+                                if($value -gt $reg.value) {
+                                    Write-Host ([string]::Format("        [ PASS ] - {0}\{1}: {2}", $item.path, $key, $value))  -ForeGroundColor Green;
+                                } else {
+                                    Write-Host ([string]::Format("        [ FAIL ] - {0}\{1}: {2}. Expected value greater or equal to: {3}", $item.path, $key, $value, $reg.value))  -ForeGroundColor Red;
+                                }
+                            }
+                        }
+                    }
+                    
+                }
+
+            }
+
+            default {
+                Write-Host "    [ FAIL ] - Unknown item type '$($item.type)'" -ForeGroundColor Red;
             }
         }
     }
@@ -564,6 +709,11 @@ if($commands -ne $null) {
 				                    Write-Host "";
                                 }
 
+                                "checkitem" {
+                                    Check-Items $check.items;
+                                    Write-Host "";
+                                }
+
                                 default {
                                     Write-Host "[ FAIL ] - Unknown check '$($check.type)'" -ForeGroundColor Red;
                                     Write-Host "";
@@ -581,10 +731,9 @@ if($commands -ne $null) {
         Write-Host "    [ FAIL ] - No entries in configuration file" -ForeGroundColor Red;
         Write-Host "";
     }
-
 } else {
     Write-Host "    [ FAIL ] - Configuration file is empty" -ForeGroundColor Red;
     Write-Host "";
 }
 
-#Read-Host -Prompt "Press Enter to exit"
+Read-Host -Prompt "Press Enter to exit"

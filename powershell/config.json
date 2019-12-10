@@ -113,6 +113,33 @@
                     }
                 ],
                 "description": "Availability group check"
+            }, {
+                "type": "checkitem",
+                "active": false,
+                "items": [
+                    {
+                        "type": "file",
+                        "path": "\\\\SVR01PROD\\TheFolder$\\Dir_01\\__VALUE__",
+                        "expected": true,
+                        "tokens": [
+                            { "token": "__VALUE__", "type": "text", "value": "TheFile.pdf" }
+                        ]
+                    }, {
+                        "type": "folder",
+                        "path": "\\\\SVR01PROD\\TheFolder$\\Dir_02\\__CURRENT_DATE__",
+                        "expected": false,
+                        "tokens": [
+                            { "token": "__CURRENT_DATE__", "type": "date", "format": "yyyy-MM-dd", "offset": { "type": "dd", "value": -2 } }
+                        ]
+                    }, {
+                        "type": "registry",
+                        "path": "HKLM:\\SOFTWARE\\Key",
+                        "items": [
+                            { "name": "Reg01", "comparison": "none" },
+                            { "name": "Reg02", "comparison": "gt", "value": "0" }
+                        ]
+                    }
+                ]
             }
         ]
     }
